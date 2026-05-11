@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
+from rich import print
 
 load_dotenv()
 
@@ -12,7 +13,7 @@ client = QdrantClient(
 print(client.get_collections())
 
 # Define the collection name
-collection_name = "grillazz_music_2_collection"
+collection_name = "grillazz_music_3_collection"
 #
 # # Create the collection with specified vector parameters
 client.create_collection(
