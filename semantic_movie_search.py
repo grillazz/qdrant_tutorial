@@ -26,11 +26,32 @@ client.create_collection(
     },
 )
 
-
-
 # Step 3: Implementing the Chunking Strategies
 tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
 MAX_TOKENS = 40
+
+
+# MAX_TOKENS = 40 is set because it is the chunk size, not the embedding model’s maximum context length. The notebook is splitting long movie descriptions into small pieces so each piece can be embedded safely, even though all-MiniLM-L6-v2 can handle up to 256 tokens.
+#
+# So the logic is:
+#
+# 256 tokens = the model’s upper limit for a single embedding input.
+#
+# 40 tokens = a conservative chunk length chosen to keep chunks short,
+# avoid boundary issues, and leave room for tokenization overhead and overlap in
+# the sentence-based splitter.
+#
+# The point is not to maximize token usage, but to make retrieval more stable
+# and prevent one chunk from mixing too many unrelated ideas.
+#
+# That notebook also explicitly says the descriptions are 240–460 tokens
+# and “chunking becomes essential,” which is why it uses fixed, sentence,
+# and semantic chunking strategies rather than feeding full descriptions directly.
+#
+# In practice, 40 is a design choice for retrieval quality,
+# not a hard requirement from the encoder.
+# A smaller chunk size often improves search precision because each embedding represents a narrower semantic unit,
+# while still staying well below the 256-token ceiling.
 
 
 def fixed_size_chunks(text, size=MAX_TOKENS):
@@ -60,7 +81,6 @@ def semantic_chunks(text):
     )
     nodes = semantic_splitter.get_nodes_from_documents([Document(text=text)])
     return [node.text for node in nodes]
-
 
 
 # Step 4: Processing and Uploading the Data
@@ -156,7 +176,6 @@ movies_data = documents = [
     }
 ]
 
-
 for movie in movies_data:  # Process each movie
     # Fixed-size chunks
     for chunk in fixed_size_chunks(movie["description"]):
@@ -187,6 +206,7 @@ for movie in movies_data:  # Process each movie
 
 client.upload_points(collection_name='movie_search', points=points)
 print(f"Uploaded {idx} vectors across three chunking strategies")
+
 
 # Step 5: Comparing Search Results
 def search_and_compare(query, k=3):
