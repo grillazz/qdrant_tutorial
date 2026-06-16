@@ -21,14 +21,14 @@ client = QdrantClient(
 # client = QdrantClient(url="http://localhost:6333")
 
 # Create collection with three named vectors
-# client.create_collection(
-#     collection_name='jira_task_search_5',
-#     vectors_config={
-#         'fixed': models.VectorParams(size=384, distance=models.Distance.COSINE),
-#         'sentence': models.VectorParams(size=384, distance=models.Distance.COSINE),
-#         'semantic': models.VectorParams(size=384, distance=models.Distance.COSINE),
-#     },
-# )
+client.create_collection(
+    collection_name='jira_task_search_5',
+    vectors_config={
+        'fixed': models.VectorParams(size=384, distance=models.Distance.COSINE),
+        'sentence': models.VectorParams(size=384, distance=models.Distance.COSINE),
+        'semantic': models.VectorParams(size=384, distance=models.Distance.COSINE),
+    },
+)
 
 # Step 3: Implementing the Chunking Strategies
 tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
@@ -223,36 +223,36 @@ jira_data = documents = [
   }
 ]
 
-# for jira_task in jira_data:  # Process each jira_task
-#     # Fixed-size chunks
-#     for chunk in fixed_size_chunks(jira_task["description"]):
-#         points.append(models.PointStruct(
-#             id=idx,
-#             vector={"fixed": encoder.encode(chunk).tolist()},
-#             payload={**jira_task, "chunk": chunk, "chunking": "fixed"}
-#         ))
-#         idx += 1
-#
-#     # Sentence-aware chunks
-#     for chunk in sentence_chunks(jira_task["description"]):
-#         points.append(models.PointStruct(
-#             id=idx,
-#             vector={"sentence": encoder.encode(chunk).tolist()},
-#             payload={**jira_task, "chunk": chunk, "chunking": "sentence"}
-#         ))
-#         idx += 1
-#
-#     # Semantic chunks
-#     for chunk in semantic_chunks(jira_task["description"]):
-#         points.append(models.PointStruct(
-#             id=idx,
-#             vector={"semantic": encoder.encode(chunk).tolist()},
-#             payload={**jira_task, "chunk": chunk, "chunking": "semantic"}
-#         ))
-#         idx += 1
-#
-# client.upload_points(collection_name='jira_task_search_5', points=points)
-# print(f"Uploaded {idx} vectors across three chunking strategies")
+for jira_task in jira_data:  # Process each jira_task
+    # Fixed-size chunks
+    for chunk in fixed_size_chunks(jira_task["description"]):
+        points.append(models.PointStruct(
+            id=idx,
+            vector={"fixed": encoder.encode(chunk).tolist()},
+            payload={**jira_task, "chunk": chunk, "chunking": "fixed"}
+        ))
+        idx += 1
+
+    # Sentence-aware chunks
+    for chunk in sentence_chunks(jira_task["description"]):
+        points.append(models.PointStruct(
+            id=idx,
+            vector={"sentence": encoder.encode(chunk).tolist()},
+            payload={**jira_task, "chunk": chunk, "chunking": "sentence"}
+        ))
+        idx += 1
+
+    # Semantic chunks
+    for chunk in semantic_chunks(jira_task["description"]):
+        points.append(models.PointStruct(
+            id=idx,
+            vector={"semantic": encoder.encode(chunk).tolist()},
+            payload={**jira_task, "chunk": chunk, "chunking": "semantic"}
+        ))
+        idx += 1
+
+client.upload_points(collection_name='jira_task_search_5', points=points)
+print(f"Uploaded {idx} vectors across three chunking strategies")
 
 
 # Step 5: Comparing Search Results
