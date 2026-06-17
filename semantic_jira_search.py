@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient, models
@@ -6,13 +10,12 @@ from qdrant_client import QdrantClient, models
 from transformers import AutoTokenizer
 from llama_index.core.node_parser import SentenceSplitter, SemanticSplitterNodeParser
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from dotenv import load_dotenv
 
-load_dotenv()
+model = "all-MiniLM-L12-v2"
 
-collection = 'jira_task_search_6'
+collection = f'jira_task_search_{model}'
 
-encoder = SentenceTransformer("all-MiniLM-L6-v2")
+encoder = SentenceTransformer(model)
 
 client = QdrantClient(
     url=os.getenv("QDRANT_URL"),
@@ -22,14 +25,16 @@ client = QdrantClient(
 # For ANN/HNSW:
 # client = QdrantClient(url="http://localhost:6333")
 
+DIMS: int = encoder.get_embedding_dimension()
+
 # Create collection with three named vectors
 if not client.collection_exists(collection_name=collection):
     client.create_collection(
         collection_name=collection,
         vectors_config={
-            'fixed': models.VectorParams(size=384, distance=models.Distance.COSINE),
-            'sentence': models.VectorParams(size=384, distance=models.Distance.COSINE),
-            'semantic': models.VectorParams(size=384, distance=models.Distance.COSINE),
+            'fixed': models.VectorParams(size=DIMS, distance=models.Distance.COSINE),
+            'sentence': models.VectorParams(size=DIMS, distance=models.Distance.COSINE),
+            'semantic': models.VectorParams(size=DIMS, distance=models.Distance.COSINE),
         },
     )
 
@@ -43,7 +48,7 @@ if "chunking" not in collection_info.payload_schema:
     )
 
 # Step 3: Implementing the Chunking Strategies
-tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
+tokenizer = AutoTokenizer.from_pretrained(f"sentence-transformers/{model}")
 MAX_TOKENS = 100
 # 256 bad ide as 1st and 2bd are not good match
 
@@ -70,7 +75,7 @@ def semantic_chunks(text):
     semantic_splitter = SemanticSplitterNodeParser(
         buffer_size=1,
         breakpoint_percentile_threshold=95,
-        embed_model=HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        embed_model=HuggingFaceEmbedding(model_name=f"sentence-transformers/{model}")
     )
     nodes = semantic_splitter.get_nodes_from_documents([Document(text=text)])
     return [node.text for node in nodes]
@@ -326,7 +331,7 @@ def analyze_chunking_effectiveness():
 
 
 # Test with different queries
-search_and_compare("prevent water stress, and reduce the risk of fungal diseases that thrive in poorly watered or over‑watered conditions. ")
+search_and_compare( "keeping plants from drying out and avoiding root rot")
 
 
 analyze_chunking_effectiveness()
