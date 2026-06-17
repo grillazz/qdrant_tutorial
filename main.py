@@ -16,13 +16,14 @@ print(client.get_collections())
 collection_name = "grillazz_music_3_collection"
 #
 # # Create the collection with specified vector parameters
-client.create_collection(
-    collection_name=collection_name,
-    vectors_config=models.VectorParams(
-        size=4,  # Dimensionality of the vectors
-        distance=models.Distance.COSINE  # Distance metric for similarity search
+if not client.collection_exists(collection_name=collection_name):
+    client.create_collection(
+        collection_name=collection_name,
+        vectors_config=models.VectorParams(
+            size=4,  # Dimensionality of the vectors
+            distance=models.Distance.COSINE  # Distance metric for similarity search
+        )
     )
-)
 
 collections = client.get_collections()
 print("Existing collections:", collections)

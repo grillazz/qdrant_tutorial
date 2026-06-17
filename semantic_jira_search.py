@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+collection = 'jira_task_search_6'
+
 encoder = SentenceTransformer("all-MiniLM-L6-v2")
 
 client = QdrantClient(
@@ -21,14 +23,24 @@ client = QdrantClient(
 # client = QdrantClient(url="http://localhost:6333")
 
 # Create collection with three named vectors
-client.create_collection(
-    collection_name='jira_task_search_5',
-    vectors_config={
-        'fixed': models.VectorParams(size=384, distance=models.Distance.COSINE),
-        'sentence': models.VectorParams(size=384, distance=models.Distance.COSINE),
-        'semantic': models.VectorParams(size=384, distance=models.Distance.COSINE),
-    },
-)
+if not client.collection_exists(collection_name=collection):
+    client.create_collection(
+        collection_name=collection,
+        vectors_config={
+            'fixed': models.VectorParams(size=384, distance=models.Distance.COSINE),
+            'sentence': models.VectorParams(size=384, distance=models.Distance.COSINE),
+            'semantic': models.VectorParams(size=384, distance=models.Distance.COSINE),
+        },
+    )
+
+# Create index for the 'chunking' field to allow filtering (idempotent if handled by status check or just try-except)
+collection_info = client.get_collection(collection_name=collection)
+if "chunking" not in collection_info.payload_schema:
+    client.create_payload_index(
+        collection_name=collection,
+        field_name="chunking",
+        field_schema=models.PayloadSchemaType.KEYWORD,
+    )
 
 # Step 3: Implementing the Chunking Strategies
 tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
@@ -251,7 +263,7 @@ for jira_task in jira_data:  # Process each jira_task
         ))
         idx += 1
 
-client.upload_points(collection_name='jira_task_search_5', points=points)
+client.upsert(collection_name=collection, points=points)
 print(f"Uploaded {idx} vectors across three chunking strategies")
 
 
@@ -262,7 +274,7 @@ def search_and_compare(query, k=3):
 
     for strategy in ['fixed', 'sentence', 'semantic']:
         results = client.query_points(
-            collection_name='jira_task_search_5',
+            collection_name=collection,
             query=encoder.encode(query).tolist(),
             using=strategy,
             limit=k,
@@ -276,6 +288,45 @@ def search_and_compare(query, k=3):
         print()
 
 
-# Test with different queries
-search_and_compare("monitoring growth to harvest the crops in best moment")
+def analyze_chunking_effectiveness():
+    """Analyze which chunking strategy works best for your domain"""
 
+    print("CHUNKING STRATEGY ANALYSIS")
+    print("=" * 40)
+
+    # Get chunk statistics for each strategy
+    for strategy in ["fixed", "sentence", "semantic"]:
+        # Count chunks per strategy
+        results = client.scroll(
+            collection_name=collection,
+            scroll_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="chunking", match=models.MatchValue(value=strategy)
+                    )
+                ]
+            ),
+            limit=100,
+        )
+
+        chunks = results[0]
+        if not chunks:
+            print(f"\n{strategy.upper()} STRATEGY: No chunks found")
+            continue
+
+        chunk_sizes = [len(chunk.payload["chunk"]) for chunk in chunks]
+
+        print(f"\n{strategy.upper()} STRATEGY:")
+        print(f"  Total chunks: {len(chunks)}")
+        print(f"  Avg chunk size: {sum(chunk_sizes)/len(chunk_sizes):.0f} chars")
+        print(f"  Size range: {min(chunk_sizes)}-{max(chunk_sizes)} chars")
+
+
+
+
+
+# Test with different queries
+search_and_compare("prevent water stress, and reduce the risk of fungal diseases that thrive in poorly watered or over‑watered conditions. ")
+
+
+analyze_chunking_effectiveness()
