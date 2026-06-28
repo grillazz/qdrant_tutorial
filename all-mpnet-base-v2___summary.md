@@ -1,4 +1,3 @@
-/Users/waco/.local/bin/uv run /Users/waco/projects/2026/qdrant_poc/.venv/bin/python /Users/waco/projects/2026/qdrant_poc/semantic_jira_search.py 
 Loading weights: 100%|██████████| 199/199 [00:00<00:00, 7780.70it/s]
 Loading weights: 100%|██████████| 199/199 [00:00<00:00, 6385.59it/s]
 Uploaded 115 vectors across three chunking strategies
