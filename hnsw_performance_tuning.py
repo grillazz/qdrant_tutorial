@@ -1,3 +1,5 @@
+import numpy as np
+import requests
 from datasets import load_dataset
 from qdrant_client import QdrantClient, models
 from tqdm import tqdm
@@ -73,12 +75,147 @@ def upload_batch_without_indexes(start_idx, end_idx):
     return 0
 
 # Upload all batches
-total_uploaded = 0
-for i in tqdm(range(0, total_points, batch_size), desc="Uploading points"):
-    uploaded = upload_batch_without_indexes(i, i + batch_size)
-    total_uploaded += uploaded
+# total_uploaded = 0
+# for i in tqdm(range(0, total_points, batch_size), desc="Uploading points"):
+#     uploaded = upload_batch_without_indexes(i, i + batch_size)
+#     total_uploaded += uploaded
 
-print(f"\nUpload completed! Total points uploaded: {total_uploaded}")
+# print(f"\nUpload completed! Total points uploaded: {total_uploaded}")
+#
+# client.update_collection(
+#     collection_name=collection,
+#     hnsw_config=models.HnswConfigDiff(
+#         m=16,  # Updated from 0 to 16
+#     )
+# )
+#
+# print("HNSW indexing enabled with m=16")
 
+
+#### query time
+
+openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+new_query = "artificial intelligence"
+
+def get_query_embedding(text):
+    try:
+        response = openai_client.embeddings.create(
+            model="text-embedding-3-large",
+            input=text,
+            dimensions=1536
+        )
+        return response.data[0].embedding
+    except Exception as e:
+        print(f"Error getting OpenAI embedding: {e}")
+        print("Using random vector as fallback...")
+        return np.random.normal(0, 1, 1536).tolist()
+
+# Get the embedding
+query_embedding = get_query_embedding(new_query)
+print("Running baseline performance test...")
+url = "https://storage.googleapis.com/qdrant-examples/query_embedding_day_2.json"
+resp = requests.get(url)
+
+query_embedding = resp.json()["query_vector"]
+# Warm up the RAM index/vectors cache with a test query
+print("Warming up caches...")
+client.query_points(collection_name=collection, query=query_embedding, limit=1)
+
+# Measure vector search performance
+search_times = []
+for _ in range(3):  # Multiple runs for a stable average
+    start_time = time.time()
+    response = client.query_points(
+        collection_name=collection,
+        query=query_embedding,
+        limit=10
+    )
+    search_time = (time.time() - start_time) * 1000
+    search_times.append(search_time)
+
+baseline_time = sum(search_times) / len(search_times)
+
+print(f"Average search time: {baseline_time:.2f}ms")
+print(f"Search times: {[f'{t:.2f}ms' for t in search_times]}")
+print(f"Found {len(response.points)} results")
+print(f"Top result: '{response.points[0].payload['title']}' (score: {response.points[0].score:.4f})")
+
+
+print("Testing filtering without payload indexes")
+
+# Create a text-based filter
+text_filter = models.Filter(
+    must=[
+        models.FieldCondition(
+            key="text",
+            match=models.MatchText(text="data")
+        )
+    ]
+)
+
+# Run multiple times for more reliable measurement
+unindexed_times = []
+for i in range(3):
+    start_time = time.time()
+    response = client.query_points(
+        collection_name=collection,
+        query=query_embedding,
+        limit=10,
+        search_params=models.SearchParams(hnsw_ef=100),
+        query_filter=text_filter
+    )
+    unindexed_times.append((time.time() - start_time) * 1000)
+
+unindexed_filter_time = sum(unindexed_times) / len(unindexed_times)
+
+print(f"Filtered search (WITHOUT index): {unindexed_filter_time:.2f}ms")
+print(f"Individual times: {[f'{t:.2f}ms' for t in unindexed_times]}")
+print(f"Overhead vs baseline: {unindexed_filter_time - baseline_time:.2f}ms")
+print(f"Found {len(response.points)} matching results")
+if response.points:
+    print(f"Top result: '{response.points[0].payload['text']}'\nScore: {response.points[0].score:.4f}")
+else:
+    print("No results found - try a different filter term")
+
+
+# client.create_payload_index(
+#     collection_name=collection,
+#     field_name="text",
+#     wait=True,
+#     field_schema=models.TextIndexParams(
+#         type="text",
+#         tokenizer="word",
+#         phrase_matching=False
+#         )
+#     )
+#
+# print("Payload index created for 'text' field")
+
+print("Testing filtering WITH payload indexes...")
+
+# Run multiple times for more reliable measurement
+indexed_times = []
+for i in range(3):
+    start_time = time.time()
+    response = client.query_points(
+        collection_name=collection,
+        query=query_embedding,
+        limit=10,
+        search_params=models.SearchParams(hnsw_ef=100),
+        query_filter=text_filter
+    )
+    indexed_times.append((time.time() - start_time) * 1000)
+
+indexed_filter_time = sum(indexed_times) / len(indexed_times)
+
+print(f"Filtered search (WITH index): {indexed_filter_time:.2f}ms")
+print(f"Individual times: {[f'{t:.2f}ms' for t in indexed_times]}")
+print(f"Overhead vs baseline: {indexed_filter_time - baseline_time:.2f}ms")
+print(f"Found {len(response.points)} matching results")
+if response.points:
+    print(f"Top result: '{response.points[0].payload['text']}'\nScore: {response.points[0].score:.4f}")
+else:
+    print("No results found - try a different filter term")
 
 client.close()
