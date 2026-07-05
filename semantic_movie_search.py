@@ -1,12 +1,14 @@
-from nltk.corpus import movie_reviews
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient, models
 
 from transformers import AutoTokenizer
 from llama_index.core.node_parser import SentenceSplitter, SemanticSplitterNodeParser
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from dotenv import load_dotenv
 
-# Step 2: The Three-Vector Experiment
+# Load environment variables from .env file
+load_dotenv()
+
 # Initialize components
 encoder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -26,7 +28,7 @@ client.create_collection(
     },
 )
 
-# Step 3: Implementing the Chunking Strategies
+# Implementing the Chunking Strategies
 tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
 MAX_TOKENS = 40
 
@@ -83,7 +85,7 @@ def semantic_chunks(text):
     return [node.text for node in nodes]
 
 
-# Step 4: Processing and Uploading the Data
+# Processing and Uploading the Data
 points = []
 idx = 0
 
@@ -208,7 +210,7 @@ client.upload_points(collection_name='movie_search', points=points)
 print(f"Uploaded {idx} vectors across three chunking strategies")
 
 
-# Step 5: Comparing Search Results
+# Comparing Search Results
 def search_and_compare(query, k=3):
     """Compare search results across all three chunking strategies"""
     print(f"Query: '{query}'\n")
