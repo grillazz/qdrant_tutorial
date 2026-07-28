@@ -85,7 +85,7 @@ def upload_batch_without_indexes(start_idx, end_idx):
 # print(f"\nUpload completed! Total points uploaded: {total_uploaded}")
 
 
-url = "https://storage.googleapis.com/qdrant-examples/query_embedding_day_2.json"
+url = "https://storage.googleapis.com/qdrant-examples/query_embedding_day_2.json" # "artificial intelligence"
 resp = requests.get(url)
 query_embedding = resp.json()["query_vector"]
 # Warm up the RAM index/vectors cache with a test query

@@ -120,7 +120,7 @@ text_filter = models.Filter(
     must=[
         models.FieldCondition(
             key="text",
-            match=models.MatchText(text="data")
+            match=models.MatchText(text="metadata")
         )
     ]
 )
@@ -188,5 +188,9 @@ if response.points:
     print(f"Top result: '{response.points[0].payload['text']}'\nScore: {response.points[0].score:.4f}")
 else:
     print("No results found - try a different filter term")
+
+for point in response.points:
+    print(f"{point.payload['text']}")
+
 
 client.close()
