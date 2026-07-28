@@ -19,6 +19,8 @@ client = QdrantClient(
 )
 ds = load_dataset("Qdrant/dbpedia-entities-openai3-text-embedding-3-large-1536-100K")
 
+# Set m=0 to skip HNSW graph links during bulk upload. Switch to a normal m after ingest to build the graph.
+# This speeds up inserts 5-10x because link creation is deferred.
 config = {"name": "fast_initial_upload", "m": 0, "ef_construct": 100}  # m=0 = ingest-only
 
 collection = str(config["name"])
@@ -27,16 +29,16 @@ if not client.collection_exists(collection_name=collection):
     client.create_collection(
         collection_name=collection,
         vectors_config=models.VectorParams(
-            size=1536,
-            distance=models.Distance.COSINE
+            size=1536, # Matches dataset dims. To match the dimensions parameter we set for the OpenAI text-embedding-3-large
+            distance=models.Distance.COSINE # Standard for normalized embeddings and semantic similarity
         ),
         hnsw_config=models.HnswConfigDiff(
-            m=int(config["m"]),
-            ef_construct=int(config["ef_construct"]),
-            full_scan_threshold=10000
+            m=int(config["m"]), # Bulk load fast: m=0 (build links after ingest).
+            ef_construct=int(config["ef_construct"]), # Build quality: used after we set m>0
+            full_scan_threshold=10000 # force HNSW instead of full scan. Uses exact search for smaller result sets
         ),
         strict_mode_config=models.StrictModeConfig(
-            enabled=False,
+            enabled=False, # set enabled=False to let you experiment with unindexed payload keys during the demo.
             unindexed_filtering_retrieve=True  # Allow filtering without indexes
         )
     )
@@ -89,6 +91,7 @@ url = "https://storage.googleapis.com/qdrant-examples/query_embedding_day_2.json
 resp = requests.get(url)
 query_embedding = resp.json()["query_vector"]
 # Warm up the RAM index/vectors cache with a test query
+# First query loads relevant index parts/vectors into memory, subsequent queries are faster
 print("Warming up caches...")
 client.query_points(collection_name=collection, query=query_embedding, limit=1)
 
