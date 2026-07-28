@@ -28,12 +28,20 @@ if not client.collection_exists(collection_name=collection):
         collection_name=collection,
         vectors_config=models.VectorParams(
             size=1536,
-            distance=models.Distance.COSINE
+            distance=models.Distance.COSINE,
+            on_disk=True,  # original vectors memmapped to disk, not RAM
         ),
         hnsw_config=models.HnswConfigDiff(
             m=int(config["m"]),
             ef_construct=int(config["ef_construct"]),
-            full_scan_threshold=10000
+            full_scan_threshold=10000,
+            on_disk=True,  # HNSW graph on disk too
+        ),
+        quantization_config=models.ScalarQuantization(
+            scalar=models.ScalarQuantizationConfig(
+                type=models.ScalarType.INT8,  # 4x smaller vectors in RAM
+                always_ram=True,  # quantized copy stays in RAM for speed
+            ),
         ),
         strict_mode_config=models.StrictModeConfig(
             enabled=False,
@@ -133,7 +141,13 @@ for i in range(3):
         collection_name=collection,
         query=query_embedding,
         limit=10,
-        search_params=models.SearchParams(hnsw_ef=100),
+        search_params=models.SearchParams(
+            hnsw_ef=100,
+            quantization=models.QuantizationSearchParams(
+                rescore=True,  # rescore with original vectors for accuracy
+                oversampling=2.0,
+            ),
+        ),
         query_filter=text_filter
     )
     unindexed_times.append((time.time() - start_time) * 1000)
@@ -173,7 +187,13 @@ for i in range(3):
         collection_name=collection,
         query=query_embedding,
         limit=10,
-        search_params=models.SearchParams(hnsw_ef=100),
+        search_params=models.SearchParams(
+            hnsw_ef=100,
+            quantization=models.QuantizationSearchParams(
+                rescore=True,  # rescore with original vectors for accuracy
+                oversampling=2.0,
+            ),
+        ),
         query_filter=text_filter
     )
     indexed_times.append((time.time() - start_time) * 1000)

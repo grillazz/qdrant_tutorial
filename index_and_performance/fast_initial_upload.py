@@ -87,6 +87,22 @@ def upload_batch_without_indexes(start_idx, end_idx):
 # print(f"\nUpload completed! Total points uploaded: {total_uploaded}")
 
 
+# Phase 2: re-enable HNSW after bulk ingest — builds the graph in the background
+client.update_collection(
+    collection_name=collection,
+    hnsw_config=models.HnswConfigDiff(m=16),
+)
+
+# Wait until indexing finishes before benchmarking
+while True:
+    info = client.get_collection(collection_name=collection)
+    if info.status == models.CollectionStatus.GREEN:
+        break
+    print(f"Indexing... status={info.status}")
+    time.sleep(5)
+print("HNSW index built")
+
+
 url = "https://storage.googleapis.com/qdrant-examples/query_embedding_day_2.json" # "artificial intelligence"
 resp = requests.get(url)
 query_embedding = resp.json()["query_vector"]
