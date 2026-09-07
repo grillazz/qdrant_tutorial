@@ -18,14 +18,14 @@ client = QdrantClient(
     timeout=300,
 )
 
-# client.create_collection(
-#     collection_name="bm25_vectors_collection",
-#     sparse_vectors_config={
-#         "bm25_sparse_vector": models.SparseVectorParams(
-#             modifier=models.Modifier.IDF #Inverse Document Frequency
-#         ),
-#     },
-# )
+client.create_collection(
+    collection_name="bm25_vectors_collection",
+    sparse_vectors_config={
+        "bm25_sparse_vector": models.SparseVectorParams(
+            modifier=models.Modifier.IDF #Inverse Document Frequency
+        ),
+    },
+)
 
 
 grocery_items_descriptions = [
