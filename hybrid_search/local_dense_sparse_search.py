@@ -10,6 +10,7 @@ with locally hosted dense and sparse models:
 """
 
 import os
+import sys
 import re
 import uuid
 import binascii
@@ -264,46 +265,54 @@ if __name__ == "__main__":
     dense_encoder = LocalDenseEncoder(model_name_or_path="sentence-transformers/all-MiniLM-L6-v2")
     sparse_encoder = LocalBM25SparseEncoder()
 
-    from dotenv import load_dotenv
-    load_dotenv()
-
     client = QdrantClient(
         url=os.getenv("QDRANT_URL"),
         api_key=os.getenv("QDRANT_API_KEY"),
         timeout=300,
     )
-    collection_name = "local_hybrid_collection"
+    collection_name = "local_hybrid_collection_11092026_1"
 
-    print(f"Creating collection '{collection_name}' with dense and sparse vector configurations...")
-    client.create_collection(
-        collection_name=collection_name,
-        vectors_config={
-            "dense": models.VectorParams(
-                size=dense_encoder.dimension,
-                distance=models.Distance.COSINE,
-            ),
-        },
-        sparse_vectors_config={
-            "sparse": models.SparseVectorParams(
-                modifier=models.Modifier.IDF,  # Dynamically computed by Qdrant
-            ),
-        },
-    )
+    try:
+        if client.collection_exists(collection_name=collection_name):
+            client.delete_collection(collection_name=collection_name)
 
-    print("Building points in batches locally...")
-    points = build_points_in_batches(docs, dense_encoder, sparse_encoder, batch_size=4)
+        print(f"Creating collection '{collection_name}' with dense and sparse vector configurations...")
+        client.create_collection(
+            collection_name=collection_name,
+            vectors_config={
+                "dense": models.VectorParams(
+                    size=dense_encoder.dimension,
+                    distance=models.Distance.COSINE,
+                ),
+            },
+            sparse_vectors_config={
+                "sparse": models.SparseVectorParams(
+                    modifier=models.Modifier.IDF,  # Dynamically computed by Qdrant
+                ),
+            },
+        )
 
-    print("Upserting points to Qdrant...")
-    upsert_batched(client, collection_name, points, batch_size=5)
+        print("Building points in batches locally...")
+        points = build_points_in_batches(docs, dense_encoder, sparse_encoder, batch_size=4)
 
-    # Perform hybrid search
-    query = "crunchy aged cheese with crystals"
-    print(f"\nExecuting Hybrid Search for: '{query}'")
-    search_results = hybrid_search(client, collection_name, query, dense_encoder, sparse_encoder, limit=3)
+        print("Upserting points to Qdrant...")
+        upsert_batched(client, collection_name, points, batch_size=5)
 
-    print("\nTop Results:")
-    for rank, point in enumerate(search_results.points, 1):
-        print(f"{rank}. [Score: {point.score:.4f}] Doc ID {point.id}: {point.payload.get('text')}")
+        # Perform hybrid search
+        query = "crunchy aged cheese with crystals"
+        print(f"\nExecuting Hybrid Search for: '{query}'")
+        search_results = hybrid_search(client, collection_name, query, dense_encoder, sparse_encoder, limit=3)
+
+        print("\nTop Results:")
+        for rank, point in enumerate(search_results.points, 1):
+            print(f"{rank}. [Score: {point.score:.4f}] Doc ID {point.id}: {point.payload.get('text')}")
+    finally:
+        client.close()
+
+    # Clean exit
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # os._exit(0)
 
 
 # This error occurs because `models.Document(...)` relies on **FastEmbed** (or Qdrant Cloud), which only supports pre-built ONNX models (like `Qdrant/bm25` or `prithivida/Splade_PP_en_v1`). `sdadas/polish-splade` is not supported by FastEmbed.
