@@ -9,6 +9,7 @@ Prefixes taken from the model cards:
     ipipan/silver-retriever-base-v1.1    query "Pytanie: ", passage "</s>"
     sdadas/stella-pl-retrieval-mini-8k   query "Instruct: ...\\nQuery: "
     sdadas/stella-pl-retrieval-8k        query "Instruct: ...\\nQuery: "
+    OPI-PIB/PolDense-17M                 query "[query]: "
 """
 
 from __future__ import annotations
@@ -78,8 +79,17 @@ POLISH_DENSE_MODELS: dict[str, DenseModel] = {
             trust_remote_code=True,
             notes="stella_en_1.5B_v5 base, ~6 GB download. Slow on CPU.",
         ),
+        DenseModel(
+            slug="poldense-17m",
+            name="OPI-PIB/PolDense-17M",
+            dim=256,
+            query_prefix="[query]: ",
+            max_seq_length=8192,
+            notes="ModernBERT-17M base, 8k context, gemma license. Fast and lightweight.",
+        ),
     )
 }
+POLISH_DENSE_MODELS["poldense"] = POLISH_DENSE_MODELS["poldense-17m"]
 
 
 class DenseEncoder:

@@ -12,6 +12,7 @@ Then:
 
     python hybrid_search/polish_hybrid_search.py
     python hybrid_search/polish_hybrid_search.py --models mmlw-base silver
+    python hybrid_search/polish_hybrid_search.py --models poldense-17m
     python hybrid_search/polish_hybrid_search.py --models stella --device cuda
     python hybrid_search/polish_hybrid_search.py --sparse bm25   # for contrast
 """
@@ -112,7 +113,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def show_models() -> None:
+    seen: set[str] = set()
     for slug, spec in POLISH_DENSE_MODELS.items():
+        if spec.name in seen:
+            continue
+        seen.add(spec.name)
         print(f"{slug:12} {spec.dim:5}d  {spec.name}")
         print(f"{'':12} {spec.notes}")
 
